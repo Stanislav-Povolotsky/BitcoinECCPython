@@ -1,6 +1,72 @@
 import random
 import hashlib
 
+class GaussInt:
+    #A class for the Gauss integers of the form a + b sqrt(n) where a,b are integers.
+    #n can be positive or negative.
+    def __init__(self,x,y,n,p=0):
+        if p:
+            self.x=x%p
+            self.y=y%p
+            self.n=n%p
+        else:
+            self.x=x
+            self.y=y
+            self.n=n
+
+        self.p=p
+        
+    def __add__(self,b):
+        return GaussInt(self.x+b.x,self.y+b.y,self.n,self.p)
+        
+    def __sub__(self,b):
+        return GaussInt(self.x-b.x,self.y-b.y,self.n,self.p)
+    
+    def __mul__(self,b):
+        return GaussInt(self.x*b.x+self.n*self.y*b.y,self.x*b.y+self.y*b.x,self.n,self.p)
+    
+    def __div__(self,b):
+        return GaussInt((self.x*b.x-self.n*self.y*b.y)/(b.x*b.x-self.n*b.y*b.y),(-self.x*b.y+self.y*b.x)/(b.x*b.x-self.n*b.y*b.y),self.n,self.p)
+    
+    def __eq__(self,b):
+        return self.x==b.x and self.y==b.y
+    
+    def __repr__(self):
+        if self.p:
+            return "%s+%s (%d,%d)"%(self.x,self.y,self.n,self.p)
+        else:
+            return "%s+%s (%d)"%(self.x,self.y,self.n)
+        
+    def __pow__(self,n):
+        b=Base(n,2)
+        t=GaussInt(1,0,self.n)
+        while b:
+            t=t*t
+            if b.pop():
+                t=self*t
+            
+        return t
+
+    def Inv(self):
+        return GaussInt(self.x/(self.x*self.x-self.n*self.y*self.y),-self.y/(self.x*self.x-self.n*self.y*self.y),self.n,self.p)
+
+def Cipolla(a,p):
+    #Find a square root of a modulo p using the algorithm of Cipolla
+    b=0
+    while pow((b*b-a)%p,(p-1)/2,p)==1:
+        b+=1
+
+    return (GaussInt(b,1,b**2-a,p)**((p+1)/2)).x
+    
+def Base(n,b):
+    #Decompose n in base b
+    l=[]
+    while n:
+        l.append(n%b)
+        n/=b
+
+    return l
+    
 def InvMod(a,n):
     #Find the inverse mod n of a.
     #Use the Extended Euclides Algorithm.
@@ -133,7 +199,7 @@ class EllipticCurvePoint:
 
     def __mul__(self,n):
         #The fast multiplication of point n times by itself.
-        b=Euler.Base(n,2)
+        b=Base(n,2)
         t=EllipticCurvePoint(self.x,self.a,self.b,self.p)
         b.pop()
         while b:
@@ -145,7 +211,7 @@ class EllipticCurvePoint:
 
     def __repr__(self):
         #print a point in (x,y) coordinate.
-        return "x=%d\ny=%d\n"%((self.x[0]*Euler.InvMod(self.x[2],self.p))%self.p,(self.x[1]*Euler.InvMod(self.x[2],self.p))%self.p)
+        return "x=%d\ny=%d\n"%((self.x[0]*InvMod(self.x[2],self.p))%self.p,(self.x[1]*InvMod(self.x[2],self.p))%self.p)
     
     def __eq__(self,x):
         #Does self==x ?
@@ -178,7 +244,7 @@ class EllipticCurvePoint:
             R=self*k
             R.Normalize()
             r=R.x[0]%self.n
-            s=(Euler.InvMod(k,self.n)*(z+r*self.d))%self.n
+            s=(InvMod(k,self.n)*(z+r*self.d))%self.n
 
         return (r,s)
         
@@ -200,7 +266,7 @@ class EllipticCurvePoint:
         if r<1 or r>self.n-1 or s<1 or s>self.n-1:
             return False
 
-        w=Euler.InvMod(s,self.n)
+        w=InvMod(s,self.n)
         u1=(z*w)%self.n
         u2=(r*w)%self.n
         R=self*u1+self.Q*u2
@@ -217,12 +283,12 @@ class EllipticCurvePoint:
         
         x=r
         y2=(pow(x,3,self.p)+self.a*x+self.b)%self.p
-        y=Euler.Cipolla(y2,self.p)
+        y=Cipolla(y2,self.p)
 
         for i in range(2):
             kG=EllipticCurvePoint([x,y,1],self.a,self.b,self.p,self.n)  
             mzG=self*((-z)%self.n)
-            self.Q=(kG*s+mzG)*Euler.InvMod(r,self.n)
+            self.Q=(kG*s+mzG)*InvMod(r,self.n)
 
             adr=self.BitcoinAddresFromPublicKey()
             if adr==adresse:
@@ -357,7 +423,7 @@ class EllipticCurvePoint:
         else:
             raise Exception
 
-def BitcoinWallet():
+def Bitcoin():
     #Create the Bitcoin elliptiv curve
     a=0
     b=7
@@ -369,17 +435,14 @@ def BitcoinWallet():
     n =int("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",16)
     
     #Create the generator    
-    bitcoin=EllipticCurvePoint([Gx,Gy,1],a,b,p,n)
+    return EllipticCurvePoint([Gx,Gy,1],a,b,p,n)
+    
+bitcoin=Bitcoin()
+#Generate the public key from the private one
+print bitcoin.BitcoinAddressFromPrivate("PrivatekeyInBase58")
 
-    #Examples :
-    
-    ##Generate the public key from the private one
-    #print bitcoin.BitcoinAddressFromPrivate("privatekey in base 58")
-    
-    ##Print the bitcoin address
-    #print bitcoin.BitcoinAddresFromPublicKey()
-    
-    ##Generate some addresses
-    #bitcoin.BitcoinAddressGenerator(10,"test.key")
-    
-BitcoinWallet()
+#Print the bitcoin address of the public key generated at the previous line
+print bitcoin.BitcoinAddresFromPublicKey()
+
+#Generate some addresses
+bitcoin.BitcoinAddressGenerator(10,"test.key")
