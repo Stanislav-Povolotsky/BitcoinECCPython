@@ -248,11 +248,13 @@ class EllipticCurvePoint:
 
         return (r,s)
         
-    def CheckECDSA(self,r,s,m):
+    def CheckECDSA(self,sig,m):
         #Check a signature (r,s) of the message m using the public key self.Q
         # and the generator which is self.
         #This is not the one used by Bitcoin because the public key isn't known;
         # only a hash of the public key is known. See the next function.
+        (r,s)=sig        
+        
         h=hashlib.new("SHA256")
         h.update(m)
         z=int(h.hexdigest(),16)
@@ -274,13 +276,14 @@ class EllipticCurvePoint:
 
         return (R.x[0]-r)%self.n==0
 
-    def VerifyMessageFromBitcoinAddress(self,adresse,m,r,s):
+    def VerifyMessageFromBitcoinAddress(self,adresse,m,sig):
         #Check a signature (r,s) for the message m signed by the Bitcoin 
         # address "addresse".
         h=hashlib.new("SHA256")
         h.update(m)
         z=int(h.hexdigest(),16)
         
+        (r,s)=sig
         x=r
         y2=(pow(x,3,self.p)+self.a*x+self.b)%self.p
         y=Cipolla(y2,self.p)
@@ -442,7 +445,15 @@ bitcoin=Bitcoin()
 print bitcoin.BitcoinAddressFromPrivate("PrivatekeyInBase58")
 
 #Print the bitcoin address of the public key generated at the previous line
-print bitcoin.BitcoinAddresFromPublicKey()
+adr=bitcoin.BitcoinAddresFromPublicKey()
+print adr
+
+#Sign a message with the current address
+m="Hello World"
+sig=bitcoin.SignECDSA("Hello World")
+#Verify the message using only the bitcoin adress, the signature and the message.
+#Not using the public key as it is not needed.
+print bitcoin.VerifyMessageFromBitcoinAddress(adr,m,sig)
 
 #Generate some addresses
 bitcoin.BitcoinAddressGenerator(10,"test.key")
