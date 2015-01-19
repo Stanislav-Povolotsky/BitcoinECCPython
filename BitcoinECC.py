@@ -1,9 +1,87 @@
-import Euler
 import random
 import hashlib
 import base64
-import time
 #import twofish
+
+class GaussInt:
+    def __init__(self,x,y,n,p=0):
+        if p:
+            self.x=x%p
+            self.y=y%p
+            self.n=n%p
+        else:
+            self.x=x
+            self.y=y
+            self.n=n
+
+        self.p=p
+        
+    def __add__(self,b):
+        return GaussInt(self.x+b.x,self.y+b.y,self.n,self.p)
+        
+    def __sub__(self,b):
+        return GaussInt(self.x-b.x,self.y-b.y,self.n,self.p)
+    
+    def __mul__(self,b):
+        return GaussInt(self.x*b.x+self.n*self.y*b.y,self.x*b.y+self.y*b.x,self.n,self.p)
+    
+    def __div__(self,b):
+        return GaussInt((self.x*b.x-self.n*self.y*b.y)/(b.x*b.x-self.n*b.y*b.y),(-self.x*b.y+self.y*b.x)/(b.x*b.x-self.n*b.y*b.y),self.n,self.p)
+    
+    def __eq__(self,b):
+        return self.x==b.x and self.y==b.y
+    
+    def __repr__(self):
+        if self.p:
+            return "%s+%s (%d,%d)"%(self.x,self.y,self.n,self.p)
+        else:
+            return "%s+%s (%d)"%(self.x,self.y,self.n)
+        
+    def __pow__(self,n):
+        b=Base(n,2)
+        t=GaussInt(1,0,self.n)
+        while b:
+            t=t*t
+            if b.pop():
+                t=self*t
+            
+        return t
+
+    def Inv(self):
+        return GaussInt(self.x/(self.x*self.x-self.n*self.y*self.y),-self.y/(self.x*self.x-self.n*self.y*self.y),self.n,self.p)
+        
+    def Eval(self):
+        return self.x.Eval()+self.y.Eval()*math.sqrt(self.n)   
+
+def Cipolla(a,p):
+    b=0
+    while pow((b*b-a)%p,(p-1)/2,p)==1:
+        b+=1
+
+    return (GaussInt(b,1,b**2-a,p)**((p+1)/2)).x
+
+def InvMod(a,n):
+    m=[]
+
+    s=n
+    while n:
+        m.append(a/n)
+        (a,n)=(n,a%n)
+
+    u=1
+    v=0
+    while m:
+        (u,v)=(v,u-m.pop()*v)
+
+    return u%s
+
+def Base(n,b):
+    l=[]
+    while n:
+        l.append(n%b)
+        n/=b
+
+    return l
 
 def MsgMagic(message):
     return "\x18Bitcoin Signed Message:\n"+chr(len(message))+message
@@ -130,7 +208,7 @@ class EllipticCurvePoint:
     
     def __mul__(self,n):
         #The fast multiplication of point n times by itself.
-        b=Euler.Base(n,2)
+        b=Base(n,2)
         t=EllipticCurvePoint(self.x,self.a,self.b,self.p)
         b.pop()
         while b:
@@ -156,11 +234,11 @@ class EllipticCurvePoint:
     def Normalize(self):
         #Transform projective coordinates of self to the usual (x,y) coordinates.
         if self.x[2]:
-            self.x[0]=(self.x[0]*Euler.InvMod(self.x[2],self.p))%self.p
-            self.x[1]=(self.x[1]*Euler.InvMod(self.x[2],self.p))%self.p
+            self.x[0]=(self.x[0]*InvMod(self.x[2],self.p))%self.p
+            self.x[1]=(self.x[1]*InvMod(self.x[2],self.p))%self.p
             self.x[2]=1
         elif self.x[1]:
-            self.x[0]=(self.x[0]*Euler.InvMod(self.x[1],self.p))%self.p
+            self.x[0]=(self.x[0]*InvMod(self.x[1],self.p))%self.p
             self.x[1]=1
         elif self.x[0]:
             self.x[0]=1
@@ -235,7 +313,7 @@ class EllipticCurvePoint:
             R=self*k
             R.Normalize()
             r=R.x[0]%self.n
-            s=(Euler.InvMod(k,self.n)*(z+r*d))%self.n
+            s=(InvMod(k,self.n)*(z+r*d))%self.n
 
         val=27
         if not uncompressed:
@@ -264,12 +342,12 @@ class EllipticCurvePoint:
         
         x=r
         y2=(pow(x,3,self.p) + self.a*x + self.b) % self.p
-        y=Euler.Cipolla(y2,self.p)
+        y=Cipolla(y2,self.p)
 
         for _ in range(2):
             kG=EllipticCurvePoint([x,y,1],self.a,self.b,self.p,self.n)  
             mzG=self*((-z)%self.n)
-            Q=(kG*s+mzG)*Euler.InvMod(r,self.n)
+            Q=(kG*s+mzG)*InvMod(r,self.n)
             
             if self.AddressFromPublicKey(Q,uncompressed)==addr:
                 return True
