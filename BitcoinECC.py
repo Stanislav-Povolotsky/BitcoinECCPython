@@ -344,7 +344,7 @@ class EllipticCurvePoint:
             addr=self.AddressFromD(d,uncompressed)
             priv=self.PrivFromD(d,uncompressed)
             liste[i]=[addr,priv]
-            print "%s 2014-01-30T12:00:00Z"%(priv)
+            print "%s %s"%(addr, priv)
 
         return liste
 
@@ -362,18 +362,20 @@ def main():
     bitcoin=Bitcoin()
 
     #Generate an adress from the private key
-    privkey = "PrivatekeyInBase58"
+    privkey = "PrivatekeyinBase58"
     adr = bitcoin.AddressFromPrivate(privkey)
-    print adr
+    print "Address : ", adr
     
     #Sign a message with the current address
     m="Hello World"
     sig=bitcoin.SignMessage("Hello World", privkey)
     #Verify the message using only the bitcoin adress, the signature and the message.
     #Not using the public key as it is not needed.
-    print bitcoin.VerifyMessageFromAddress(adr,m,sig)
+    if bitcoin.VerifyMessageFromAddress(adr,m,sig):
+        print "Message verified"
     
     #Generate some addresses
+    print "Here are some adresses and associated private keys"
     bitcoin.AddressGenerator(10)
     
 main()
