@@ -271,7 +271,8 @@ class EllipticCurvePoint:
         #Generate a private key. It's just a random number between 1 and n-1.
         #Of course, this function isn't cryptographically secure.
         #Don't use it to generate your key. Use a cryptographically secure source of randomness instead.
-        return random.randint(1,self.n-1)
+        #return random.randint(1,self.n-1)
+        return random.SystemRandom().randint(1,self.n-1) # Better random fix 
 
     def CheckECDSA(self,sig,message,Q):
         #Check a signature (r,s) of the message m using the public key self.Q
@@ -308,7 +309,8 @@ class EllipticCurvePoint:
         r=0
         s=0
         while not r or not s:
-            k=random.randint(1,self.n-1)
+            #k=random.randint(1,self.n-1)
+            k=random.SystemRandom().randint(1,self.n-1) # Better random fix
             R=self*k
             R.Normalize()
             r=R.x[0]%self.n
@@ -455,4 +457,4 @@ def main():
     print "Here are some adresses and associated private keys"
     bitcoin.AddressGenerator(10)
     
-main()
+if __name__ == "__main__": main()
