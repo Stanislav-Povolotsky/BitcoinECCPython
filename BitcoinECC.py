@@ -1,7 +1,6 @@
 import random
 import hashlib
 import base64
-#import twofish
 
 class GaussInt:
     def __init__(self,x,y,n,p=0):
@@ -220,7 +219,7 @@ class EllipticCurvePoint:
     
     def __repr__(self):
         #print a point in (x,y) coordinate.
-        return "x=%d\ny=%d\n"%((self.x[0]*Euler.InvMod(self.x[2],self.p))%self.p,(self.x[1]*Euler.InvMod(self.x[2],self.p))%self.p)
+        return "x=%d\ny=%d\n"%((self.x[0]*InvMod(self.x[2],self.p))%self.p,(self.x[1]*InvMod(self.x[2],self.p))%self.p)
     
     def __eq__(self,y):
         #Does self==y ?
@@ -292,7 +291,7 @@ class EllipticCurvePoint:
 
         z=Byte2Int(Hash(Hash(MsgMagic(message),"SHA256"),"SHA256"))
         
-        w=Euler.InvMod(s,self.n)
+        w=InvMod(s,self.n)
         u1=(z*w)%self.n
         u2=(r*w)%self.n
         R=self*u1+Q*u2
