@@ -1,5 +1,4 @@
 import BitcoinECC
-import oldBitcoinECC
 
 bitcoin = BitcoinECC.Bitcoin()
 
@@ -12,17 +11,8 @@ privatekey = "5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ"
 address = bitcoin.AddressFromPrivate(privatekey)
 
 # New lib
-print "-- New BitcoinECC --"
-print "Addr:  ", bitcoin.AddressFromPrivate(privatekey)
-sig = bitcoin.SignMessage("Hello World", privatekey) 
-print "Sig:   ", sig
-print "Verify:", bitcoin.VerifyMessageFromAddress(address, "Hello World",sig)
-
-# Old lib
-print "-- Old Bitcoin ECC --"
-bitcoin = oldBitcoinECC.Bitcoin()
-print "Public:", bitcoin.BitcoinAddressFromPrivate(privatekey)
-print "Addr:  ", bitcoin.BitcoinAddresFromPublicKey()
-sig = bitcoin.SignECDSA("Hello World")
-print "Sig:   ", sig
-print "Verify:", bitcoin.VerifyMessageFromBitcoinAddress(address, "Hello World", sig)
+print("Addr:   %s" % bitcoin.AddressFromPrivate(privatekey))
+print("Public: %s" % bitcoin.PublicFromPrivate(privatekey))
+sig = bitcoin.SignMessage(b"Hello World", privatekey) 
+print("Sig:    %s" % sig)
+print("Verify: %s" % bitcoin.VerifyMessageFromAddress(address, b"Hello World",sig))
