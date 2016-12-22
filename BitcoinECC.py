@@ -25,7 +25,7 @@ class GaussInt:
         return GaussInt(self.x*b.x+self.n*self.y*b.y,self.x*b.y+self.y*b.x,self.n,self.p)
     
     def __div__(self,b):
-        return GaussInt((self.x*b.x-self.n*self.y*b.y)/(b.x*b.x-self.n*b.y*b.y),(-self.x*b.y+self.y*b.x)/(b.x*b.x-self.n*b.y*b.y),self.n,self.p)
+        return GaussInt((self.x*b.x-self.n*self.y*b.y)//(b.x*b.x-self.n*b.y*b.y),(-self.x*b.y+self.y*b.x)//(b.x*b.x-self.n*b.y*b.y),self.n,self.p)
     
     def __eq__(self,b):
         return self.x==b.x and self.y==b.y
@@ -47,24 +47,23 @@ class GaussInt:
         return t
 
     def Inv(self):
-        return GaussInt(self.x/(self.x*self.x-self.n*self.y*self.y),-self.y/(self.x*self.x-self.n*self.y*self.y),self.n,self.p)
+        return GaussInt(self.x//(self.x*self.x-self.n*self.y*self.y),-self.y//(self.x*self.x-self.n*self.y*self.y),self.n,self.p)
         
     def Eval(self):
         return self.x.Eval()+self.y.Eval()*math.sqrt(self.n)   
 
 def Cipolla(a,p):
     b=0
-    while pow((b*b-a)%p,(p-1)/2,p)==1:
+    while pow((b*b-a)%p,(p-1)//2,p)==1:
         b+=1
 
-    return (GaussInt(b,1,b**2-a,p)**((p+1)/2)).x
+    return (GaussInt(b,1,b**2-a,p)**((p+1)//2)).x
 
 def InvMod(a,n):
     m=[]
-
     s=n
     while n:
-        m.append(a/n)
+        m.append(a//n)
         (a,n)=(n,a%n)
 
     u=1
@@ -78,12 +77,12 @@ def Base(n,b):
     l=[]
     while n:
         l.append(n%b)
-        n/=b
+        n//=b
 
     return l
 
 def MsgMagic(message):
-    return "\x18Bitcoin Signed Message:\n"+chr(len(message))+message
+    return bytearray(b"\x18Bitcoin Signed Message:\n")+bytearray((len(message),))+bytearray(message)
 
 def Hash(m,method):
     h=hashlib.new(method)
@@ -98,7 +97,7 @@ def b58encode(v):
     val=0
     for c in v:
         val*=256
-        val+=ord(c)
+        val+=c
 
     result=""
     while val:
@@ -123,10 +122,10 @@ def b58decode(v):
         val*=base
         val+=digit.find(c)
 
-    result=""
+    result=bytearray()
     while val:
         (val,mod)=divmod(val,256)
-        result=chr(mod)+result
+        result=bytearray((mod,))+result
 
     pad=0
     for c in v:
@@ -135,13 +134,14 @@ def b58decode(v):
         else:
             break
 
-    return "\x00"*pad+result
+    return bytearray(b"\x00"*pad)+result
 
-def Byte2Int(b):
+def Byte2Int(b_arg):
+    b = bytearray(b_arg)
     n=0
     for x in b:
         n*=256
-        n+=ord(x)
+        n+=x
     
     return n
 
@@ -149,7 +149,7 @@ def Byte2Hex(b):
     #Convert a byte string to hex number
     out=""
     for x in b:
-        y=hex(ord(x))[2:]
+        y=hex(x)[2:]
         if len(y)==1:
             y="0"+y
         out+="%2s"%y
@@ -158,11 +158,13 @@ def Byte2Hex(b):
 
 def Int2Byte(n,b):
     #Convert a integer to a byte string of length b
-    out=""
-    
+    out=bytearray(b)
+
+    pos = b
     for _ in range(b):
         (n,m)=divmod(n,256)
-        out=chr(m)+out
+        pos -= 1
+        out[pos] = m
     
     return out
 
@@ -178,6 +180,7 @@ class EllipticCurvePoint:
         self.b=b
         self.p=p
         self.n=n
+        self.address_prefix = "1"
     
     def __add__(self,y):
         #The main function to add self and y
@@ -229,6 +232,9 @@ class EllipticCurvePoint:
     def __ne__(self,y):
         #Does self!=x ?
         return not (self == y)
+    
+    def SetAddrPrefix(self,addr_prefix):
+        self.addr_prefix = addr_prefix
     
     def Normalize(self):
         #Transform projective coordinates of self to the usual (x,y) coordinates.
@@ -320,7 +326,7 @@ class EllipticCurvePoint:
         if not uncompressed:
             val+=4
 
-        return base64.standard_b64encode(chr(val)+Int2Byte(r,32)+Int2Byte(s,32))
+        return base64.standard_b64encode(bytearray((val,))+Int2Byte(r,32)+Int2Byte(s,32))
 
     def VerifyMessageFromAddress(self,addr,message,sig):
         #Check a signature (r,s) for the message m signed by the Bitcoin 
@@ -331,7 +337,7 @@ class EllipticCurvePoint:
 
         z=Byte2Int(Hash(Hash(MsgMagic(message),"SHA256"),"SHA256"))        
 
-        val=ord(sign[0])
+        val=(sign[0])
         if val<27 or val>=35:
             return False
 
@@ -360,13 +366,22 @@ class EllipticCurvePoint:
     def AddressFromPrivate(self,priv):
         #Transform a private key to a bitcoin address.
         (d,uncompressed)=self.DFromPriv(priv)
-        
         return self.AddressFromD(d,uncompressed)
+
+    def PublicFromPrivate(self,priv):
+        (d,uncompressed)=self.DFromPriv(priv)
+        Q = self*d
+        Q.Normalize()
+        if uncompressed:
+            pk=bytearray((4,))+Int2Byte(Q.x[0],32)+Int2Byte(Q.x[1],32)
+        else:
+            pk=bytearray(((2+Q.x[1]%2),))+Int2Byte(Q.x[0],32)
+        return Byte2Hex(pk)
 
     def PrivFromD(self,d,uncompressed):
         #Encode a private key self.d to base58 encoding.
         p=Int2Byte(d,32)
-        p="\x80"+p
+        p=bytearray((0x80,))+p
         
         if not uncompressed:
             p+=chr(1)
@@ -374,9 +389,9 @@ class EllipticCurvePoint:
         cs=Hash(Hash(p,"SHA256"),"SHA256")[:4]
 
         return b58encode(p+cs)
-    
+
     def DFromPriv(self,priv):
-        uncompressed=(len(priv)==51)
+        uncompressed=(len(priv)>=51 and len(priv)<=52)
         priv=b58decode(priv)
         
         if uncompressed:
@@ -392,14 +407,14 @@ class EllipticCurvePoint:
         # (x,y) coordinates.
         Q.Normalize()
         if uncompressed:
-            pk=chr(4)+Int2Byte(Q.x[0],32)+Int2Byte(Q.x[1],32)
+            pk=bytearray((4,))+Int2Byte(Q.x[0],32)+Int2Byte(Q.x[1],32)
         else:
-            pk=chr(2+Q.x[1]%2)+Int2Byte(Q.x[0],32)
+            pk=bytearray(((2+Q.x[1]%2),))+Int2Byte(Q.x[0],32)
 
-        kh=chr(0)+Hash(Hash(pk,"SHA256"),"RIPEMD160")
+        kh=bytearray((0,))+Hash(Hash(pk,"SHA256"),"RIPEMD160")
         cs=Hash(Hash(kh,"SHA256"),"SHA256")[:4]
 
-        return b58encode(kh+cs)
+        return self.addr_prefix + b58encode(kh+cs)
 
     def AddressFromD(self,d,uncompressed):
         #Computes a bitcoin address given the private key self.d.
@@ -417,17 +432,16 @@ class EllipticCurvePoint:
     def AddressGenerator(self,k,uncompressed=True):
         #Generate Bitcoin address and write them in the multibit format.
         #Change the date as you like.
-        liste={}
+        liste=[]
         for i in range(k):
             d=self.GenerateD()
             addr=self.AddressFromD(d,uncompressed)
             priv=self.PrivFromD(d,uncompressed)
-            liste[i]=[addr,priv]
-            print "%s %s"%(addr, priv)
-
+            liste+=((addr,priv),)
+            #print("%s %s"% (addr, priv))
         return liste
 
-def Bitcoin():
+def Bitcoin(addr_prefix="1"):
     a=0
     b=7
     p=2**256-2**32-2**9-2**8-2**7-2**6-2**4-1
@@ -435,7 +449,9 @@ def Bitcoin():
     Gy=int("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8",16)
     n=int("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",16)
     
-    return EllipticCurvePoint([Gx,Gy,1],a,b,p,n)
+    res = EllipticCurvePoint([Gx,Gy,1],a,b,p,n)
+    res.SetAddrPrefix(addr_prefix)
+    return res
 
 def main():
     bitcoin=Bitcoin()
@@ -443,18 +459,23 @@ def main():
     #Generate an adress from the private key
     privkey = "PrivatekeyinBase58"
     adr = bitcoin.AddressFromPrivate(privkey)
-    print "Address : ", adr
+    print("Address : %s" % adr)
     
     #Sign a message with the current address
-    m="Hello World"
-    sig=bitcoin.SignMessage("Hello World", privkey)
+    m=b"Hello World"
+    sig=bitcoin.SignMessage(b"Hello World", privkey)
     #Verify the message using only the bitcoin adress, the signature and the message.
     #Not using the public key as it is not needed.
     if bitcoin.VerifyMessageFromAddress(adr,m,sig):
-        print "Message verified"
+        print("Message verified")
+    else:
+        print("Message verification FAILED")
     
     #Generate some addresses
-    print "Here are some adresses and associated private keys"
-    bitcoin.AddressGenerator(10)
+    print("Here are some adresses and associated private keys")
+    addrs = bitcoin.AddressGenerator(10)
+    for addr in addrs:
+        print("%s\t%s" % addr)
+        #print(addr)
     
 if __name__ == "__main__": main()
