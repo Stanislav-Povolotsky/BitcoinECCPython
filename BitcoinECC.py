@@ -98,7 +98,7 @@ def b58encode(v):
     for c in v:
         val*=256
         val+=c
-
+    
     result=""
     while val:
         (val,mod)=divmod(val,base)
@@ -106,11 +106,10 @@ def b58encode(v):
 
     pad=0
     for c in v:
-        if c=="\x00":
+        if c==0:
             pad+=1
         else:
             break
-    
     return (digit[0]*pad)+result
 
 def b58decode(v):
@@ -180,7 +179,7 @@ class EllipticCurvePoint:
         self.b=b
         self.p=p
         self.n=n
-        self.address_prefix = "1"
+        self.addr_prefix = bytearray((0,))
     
     def __add__(self,y):
         #The main function to add self and y
@@ -384,15 +383,22 @@ class EllipticCurvePoint:
         p=bytearray((0x80,))+p
         
         if not uncompressed:
-            p+=chr(1)
+            p+=bytearray((1,))
 
         cs=Hash(Hash(p,"SHA256"),"SHA256")[:4]
 
         return b58encode(p+cs)
 
+    def PrivFromBlob(self,blob,uncompressed):
+        return self.PrivFromD(int.from_bytes(blob, byteorder='big', signed=False), uncompressed)
+
+    def BlobFromPriv(self,priv):
+        (d, uncompr) = self.DFromPriv(priv)
+        return (d.to_bytes(32, byteorder='big', signed=False), uncompr)
+
     def DFromPriv(self,priv):
-        uncompressed=(len(priv)>=51 and len(priv)<=52)
         priv=b58decode(priv)
+        uncompressed=False if (len(priv) > (1+32+4) and priv[-5] == 1) else True
         
         if uncompressed:
             priv=priv[:-4]
@@ -411,10 +417,17 @@ class EllipticCurvePoint:
         else:
             pk=bytearray(((2+Q.x[1]%2),))+Int2Byte(Q.x[0],32)
 
-        kh=bytearray((0,))+Hash(Hash(pk,"SHA256"),"RIPEMD160")
+        kh=self.addr_prefix+Hash(Hash(pk,"SHA256"),"RIPEMD160")
         cs=Hash(Hash(kh,"SHA256"),"SHA256")[:4]
 
-        return self.addr_prefix + b58encode(kh+cs)
+        return b58encode(kh+cs)
+
+    def BinAddressFromTextAddress(self,txt_addr):
+        return b58decode(txt_addr)[len(self.addr_prefix):-4] 
+
+    def TextAddressFromBinAddress(self,bin_addr):
+        cs=Hash(Hash(self.addr_prefix+bin_addr,"SHA256"),"SHA256")[:4]
+        return b58encode(self.addr_prefix+bin_addr+cs)
 
     def AddressFromD(self,d,uncompressed):
         #Computes a bitcoin address given the private key self.d.
@@ -441,7 +454,7 @@ class EllipticCurvePoint:
             #print("%s %s"% (addr, priv))
         return liste
 
-def Bitcoin(addr_prefix="1"):
+def Bitcoin(addr_prefix=b"\x00"):
     a=0
     b=7
     p=2**256-2**32-2**9-2**8-2**7-2**6-2**4-1
